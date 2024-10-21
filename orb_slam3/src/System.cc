@@ -221,6 +221,13 @@ System::System(const string &strVocFile, const string &strSettingsFile, const eS
 
 }
 
+void System::RemoveIMU(){
+    mSensor = MONOCULAR;
+    mpTracker->mSensor = System::MONOCULAR;
+    mpLocalMapper->mbInertial = false;
+    // eSensor = ORB_SLAM3::System::MONOCULAR;
+}
+
 Sophus::SE3f System::TrackStereo(const cv::Mat &imLeft, const cv::Mat &imRight, const double &timestamp, const vector<IMU::Point>& vImuMeas, string filename)
 {
     if(mSensor!=STEREO && mSensor!=IMU_STEREO)

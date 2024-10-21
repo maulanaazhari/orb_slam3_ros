@@ -22,6 +22,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <nav_msgs/Odometry.h>
 #include <visualization_msgs/Marker.h>
+#include <std_srvs/Trigger.h>
 
 #include <message_filters/subscriber.h>
 #include <message_filters/time_synchronizer.h>
@@ -32,6 +33,9 @@
 // ORB-SLAM3-specific libraries
 #include "System.h"
 #include "ImuTypes.h"
+
+// #ifndef ORB_SLAM_COMMON_H
+// #define ORB_SLAM_COMMON_H
 
 extern ORB_SLAM3::System* pSLAM;
 extern ORB_SLAM3::System::eSensor sensor_type;
@@ -60,6 +64,16 @@ void publish_kf_markers(std::vector<Sophus::SE3f>, ros::Time);
 bool save_map_srv(orb_slam3_ros::SaveMap::Request&, orb_slam3_ros::SaveMap::Response&);
 bool save_traj_srv(orb_slam3_ros::SaveMap::Request&, orb_slam3_ros::SaveMap::Response&);
 
+
+
+
+bool start_init_srv(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+bool start_scale_calib_srv(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+bool end_scale_calib_srv(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res);
+// bool start_calib_srv()
+
 cv::Mat SE3f_to_cvMat(Sophus::SE3f);
 tf::Transform SE3f_to_tfTransform(Sophus::SE3f);
 sensor_msgs::PointCloud2 mappoint_to_pointcloud(std::vector<ORB_SLAM3::MapPoint*>, ros::Time);
+
+// #endif

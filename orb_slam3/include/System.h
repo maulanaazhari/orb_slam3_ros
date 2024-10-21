@@ -141,6 +141,8 @@ public:
     void Shutdown();
     bool isShutDown();
 
+    void RemoveIMU();
+
     // Save camera trajectory in the TUM RGB-D dataset format.
     // Only for stereo and RGB-D. This method does not work for monocular.
     // Call first Shutdown()
@@ -202,7 +204,7 @@ public:
     void InsertTrackTime(double& time);
 #endif
 
-private:
+public:
 
     bool SaveAtlas(int type);
     bool LoadAtlas(int type);

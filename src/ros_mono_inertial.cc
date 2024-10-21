@@ -31,6 +31,9 @@ public:
     queue<sensor_msgs::ImageConstPtr> img0Buf;
     std::mutex mBufMutex;
     ImuGrabber *mpImuGb;
+
+    bool is_initialized = false;
+    ros::Time initialization_time;
 };
 
 
@@ -67,8 +70,10 @@ int main(int argc, char **argv)
     node_handler.param<std::string>(node_name + "/imu_frame_id", imu_frame_id, "imu");
 
     // Create SLAM system. It initializes all system threads and gets ready to process frames.
-    sensor_type = ORB_SLAM3::System::IMU_MONOCULAR;
-    pSLAM = new ORB_SLAM3::System(voc_file, settings_file, sensor_type, enable_pangolin);
+    // sensor_type = ORB_SLAM3::System::IMU_MONOCULAR;
+    pSLAM = new ORB_SLAM3::System(voc_file, settings_file, ORB_SLAM3::System::IMU_MONOCULAR, enable_pangolin);
+
+    sensor_type = pSLAM->mSensor;
 
     ImuGrabber imugb;
     ImageGrabber igb(&imugb);
@@ -131,14 +136,32 @@ void ImageGrabber::SyncWithImu()
 {
     while(1)
     {
+        // std::cout<<"image buff: "<<!img0Buf.empty()<<std::endl;
+        // std::cout<<"imu buff: "<<!mpImuGb->imuBuf.empty()<<std::endl;
         if (!img0Buf.empty()&&!mpImuGb->imuBuf.empty())
         {
             cv::Mat im;
             double tIm = 0;
 
+            if (!is_initialized){
+                bool new_is_initialized = !(pSLAM->mpTracker->mState == ORB_SLAM3::Tracking::NO_IMAGES_YET  || pSLAM->mpTracker->mState == ORB_SLAM3::Tracking::NOT_INITIALIZED);
+                // bool new_is_initialized = pSLAM->mpTracker->mpAtlas->GetCurrentMap()->isImuInitialized();
+                // bool new_is_initialized = pSLAM->mpTracker->mpAtlas->GetCurrentMap()->GetIniertialBA2();
+                if(new_is_initialized){
+                    is_initialized = true;
+                    initialization_time = ros::Time::now();
+                    ROS_INFO("IMU is initialized!");
+                }
+            }
+            
+
+            // std::cout<<"is initialized: "<<is_initialized<<std::endl;
             tIm = img0Buf.front()->header.stamp.toSec();
-            if(tIm>mpImuGb->imuBuf.back()->header.stamp.toSec())
+            if(
+                tIm>mpImuGb->imuBuf.back()->header.stamp.toSec()
+            ){
                 continue;
+            }
             
             this->mBufMutex.lock();
             im = GetImage(img0Buf.front());
@@ -170,8 +193,21 @@ void ImageGrabber::SyncWithImu()
             }
             mpImuGb->mBufMutex.unlock();
 
-            // ORB-SLAM3 runs in TrackMonocular()
-            Sophus::SE3f Tcw = pSLAM->TrackMonocular(im, tIm, vImuMeas);
+            Sophus::SE3f Tcw;
+
+            if (is_initialized && (ros::Time::now() - initialization_time > ros::Duration(1.4))){
+                pSLAM->RemoveIMU();
+                // pSLAM->mpTracker->mSensor = ORB_SLAM3::System::MONOCULAR;
+                // pSLAM->mSensor = ORB_SLAM3::System::MONOCULAR;
+                // pSLAM->eSensor = ORB_SLAM3::System::MONOCULAR;
+                sensor_type = ORB_SLAM3::System::MONOCULAR;
+                Tcw = pSLAM->TrackMonocular(im, tIm);
+            }
+            else{
+                Tcw = pSLAM->TrackMonocular(im, tIm, vImuMeas);
+            }
+            
+            // Sophus::SE3f Tcw = pSLAM->TrackMonocular(im, tIm, vImuMeas);
             
             publish_topics(msg_time, Wbb);
         }

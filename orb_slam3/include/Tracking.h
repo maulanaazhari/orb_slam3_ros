@@ -198,7 +198,7 @@ public:
     vector<double> vdTrackTotal_ms;
 #endif
 
-protected:
+public:
 
     // Main tracking function. It is independent of the input sensor.
     void Track();

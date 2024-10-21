@@ -129,7 +129,7 @@ public:
     int nLBA_exec;
     int nLBA_abort;
 #endif
-protected:
+public:
 
     bool CheckNewKeyFrames();
     void ProcessNewKeyFrame();

@@ -17,6 +17,10 @@ ros::Publisher tracked_mappoints_pub, all_mappoints_pub;
 ros::Publisher tracked_keypoints_pub;
 image_transport::Publisher tracking_img_pub;
 
+Sophus::SE3f Twc_start, Twc_end;
+float scale;
+bool is_started;
+
 //////////////////////////////////////////////////
 // Main functions
 //////////////////////////////////////////////////
@@ -56,10 +60,41 @@ bool save_traj_srv(orb_slam3_ros::SaveMap::Request &req, orb_slam3_ros::SaveMap:
     return res.success;
 }
 
+bool start_init_srv(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res){
+    // Twc_start = pSLAM->GetCamTwc();
+    scale = 1.0;
+    res.success = true;
+    return res.success;
+}
+
+bool start_scale_calib_srv(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res){
+    Twc_start = pSLAM->GetCamTwc();
+    res.success = true;
+    return res.success;
+}
+
+bool end_scale_calib_srv(std_srvs::Trigger::Request &req, std_srvs::Trigger::Response &res){
+    Twc_end = pSLAM->GetCamTwc();
+
+    float dist = sqrt(pow((Twc_start.translation().x() - Twc_end.translation().x()),2) + 
+                pow((Twc_start.translation().x() - Twc_end.translation().x()),2) +
+                pow((Twc_start.translation().x() - Twc_end.translation().x()),2));
+    scale = 1.0/dist;
+    ROS_INFO("Scale calibration is finished, the scale is : %f", scale);
+    res.success = true;
+    return res.success;
+}
+
+
+
 void setup_services(ros::NodeHandle &node_handler, std::string node_name)
 {
+    scale = 1.0;
     static ros::ServiceServer save_map_service = node_handler.advertiseService(node_name + "/save_map", save_map_srv);
     static ros::ServiceServer save_traj_service = node_handler.advertiseService(node_name + "/save_traj", save_traj_srv);
+
+    static ros::ServiceServer start_scale_calib_service = node_handler.advertiseService(node_name + "/start_scale_calib", start_scale_calib_srv);
+    static ros::ServiceServer end_scale_calib_service = node_handler.advertiseService(node_name + "/end_scale_calib", end_scale_calib_srv);
 }
 
 void setup_publishers(ros::NodeHandle &node_handler, image_transport::ImageTransport &image_transport, std::string node_name)
@@ -85,6 +120,8 @@ void setup_publishers(ros::NodeHandle &node_handler, image_transport::ImageTrans
 void publish_topics(ros::Time msg_time, Eigen::Vector3f Wbb)
 {
     Sophus::SE3f Twc = pSLAM->GetCamTwc();
+    // multiply the pose with the scale
+    Twc.translation() = Twc.translation()*scale;
 
     if (Twc.translation().array().isNaN()[0] || Twc.rotationMatrix().array().isNaN()(0,0)) // avoid publishing NaN
         return;
@@ -256,10 +293,11 @@ void publish_kf_markers(std::vector<Sophus::SE3f> vKFposes, ros::Time msg_time)
 
     for (int i = 0; i <= numKFs; i++)
     {
+        // multiply the marker with the scale
         geometry_msgs::Point kf_marker;
-        kf_marker.x = vKFposes[i].translation().x();
-        kf_marker.y = vKFposes[i].translation().y();
-        kf_marker.z = vKFposes[i].translation().z();
+        kf_marker.x = vKFposes[i].translation().x()*scale;
+        kf_marker.y = vKFposes[i].translation().y()*scale;
+        kf_marker.z = vKFposes[i].translation().z()*scale;
         kf_markers.points.push_back(kf_marker);
     }
     
@@ -357,9 +395,9 @@ sensor_msgs::PointCloud2 mappoint_to_pointcloud(std::vector<ORB_SLAM3::MapPoint*
             tf::Vector3 point_translation(P3Dw.x(), P3Dw.y(), P3Dw.z());
 
             float data_array[num_channels] = {
-                point_translation.x(),
-                point_translation.y(),
-                point_translation.z()
+                point_translation.x()*scale,
+                point_translation.y()*scale,
+                point_translation.z()*scale
             };
 
             memcpy(cloud_data_ptr+(i*cloud.point_step), data_array, num_channels*sizeof(float));
