@@ -77,15 +77,13 @@ bool end_scale_calib_srv(std_srvs::Trigger::Request &req, std_srvs::Trigger::Res
     Twc_end = pSLAM->GetCamTwc();
 
     float dist = sqrt(pow((Twc_start.translation().x() - Twc_end.translation().x()),2) + 
-                pow((Twc_start.translation().x() - Twc_end.translation().x()),2) +
-                pow((Twc_start.translation().x() - Twc_end.translation().x()),2));
+                pow((Twc_start.translation().y() - Twc_end.translation().y()),2) +
+                pow((Twc_start.translation().z() - Twc_end.translation().z()),2));
     scale = 1.0/dist;
     ROS_INFO("Scale calibration is finished, the scale is : %f", scale);
     res.success = true;
     return res.success;
 }
-
-
 
 void setup_services(ros::NodeHandle &node_handler, std::string node_name)
 {
@@ -121,10 +119,19 @@ void publish_topics(ros::Time msg_time, Eigen::Vector3f Wbb)
 {
     Sophus::SE3f Twc = pSLAM->GetCamTwc();
     // multiply the pose with the scale
+    // Eigen::Matrix4f Tcr_eigen;
+    // Tcr_eigen << 0, 0, 1, 0,
+    //             -1, 0, 0, 0,
+    //             0, -1, 0, 0,
+    //             0, 0, 0, 1;
+    // Sophus::SE3f Tcr(Tcr_eigen);
+
     Twc.translation() = Twc.translation()*scale;
 
     if (Twc.translation().array().isNaN()[0] || Twc.rotationMatrix().array().isNaN()(0,0)) // avoid publishing NaN
         return;
+
+    // Twc = Tcr*Twc;
     
     // Common topics
     publish_camera_pose(Twc, msg_time);
@@ -295,9 +302,9 @@ void publish_kf_markers(std::vector<Sophus::SE3f> vKFposes, ros::Time msg_time)
     {
         // multiply the marker with the scale
         geometry_msgs::Point kf_marker;
-        kf_marker.x = vKFposes[i].translation().x()*scale;
-        kf_marker.y = vKFposes[i].translation().y()*scale;
-        kf_marker.z = vKFposes[i].translation().z()*scale;
+        kf_marker.x = vKFposes[i].translation().x();
+        kf_marker.y = vKFposes[i].translation().y();
+        kf_marker.z = vKFposes[i].translation().z();
         kf_markers.points.push_back(kf_marker);
     }
     
@@ -395,9 +402,9 @@ sensor_msgs::PointCloud2 mappoint_to_pointcloud(std::vector<ORB_SLAM3::MapPoint*
             tf::Vector3 point_translation(P3Dw.x(), P3Dw.y(), P3Dw.z());
 
             float data_array[num_channels] = {
-                point_translation.x()*scale,
-                point_translation.y()*scale,
-                point_translation.z()*scale
+                point_translation.x(),
+                point_translation.y(),
+                point_translation.z()
             };
 
             memcpy(cloud_data_ptr+(i*cloud.point_step), data_array, num_channels*sizeof(float));
