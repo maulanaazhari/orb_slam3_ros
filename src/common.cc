@@ -88,6 +88,8 @@ bool end_scale_calib_srv(std_srvs::Trigger::Request &req, std_srvs::Trigger::Res
 void setup_services(ros::NodeHandle &node_handler, std::string node_name)
 {
     scale = 1.0;
+
+    
     static ros::ServiceServer save_map_service = node_handler.advertiseService(node_name + "/save_map", save_map_srv);
     static ros::ServiceServer save_traj_service = node_handler.advertiseService(node_name + "/save_traj", save_traj_srv);
 
